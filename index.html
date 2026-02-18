@@ -339,18 +339,31 @@
             cargarDeNube();
         };
 
-        // --- FUNCIÓN ANTICACHÉ: TRAER DATOS DE GOOGLE ---
+        // --- FUNCIÓN INTELIGENTE: PROTECCIÓN CONTRA LENTITUD DE GOOGLE ---
         function cargarDeNube() {
              // Solo mostramos overlay si no hay eventos previos (primera carga)
              if(events.length === 0) loadingOverlay.style.display = 'flex';
 
-             // Usamos timestamp para romper el caché
              fetch(GOOGLE_SCRIPT_URL + "?t=" + new Date().getTime())
             .then(response => response.json())
             .then(data => {
-                console.log("Datos actualizados:", data);
+                console.log("Datos actualizados recibidos:", data);
                 if(Array.isArray(data)) {
-                    events = data; 
+                    // AQUÍ ESTÁ EL TRUCO:
+                    // 1. Tomamos los IDs que Google nos devuelve.
+                    const idsNube = new Set(data.map(e => String(e.id)));
+                    
+                    // 2. Revisamos nuestros eventos locales.
+                    // Si hay un evento CREADO HACE POCO (menos de 2 minutos) que Google NO devolvió,
+                    // asumimos que es porque Google está lento, y lo volvemos a meter en la lista.
+                    const eventosLocalesRecientes = events.filter(e => {
+                        const esReciente = (Date.now() - e.id) < 120000; // 2 minutos de gracia
+                        return esReciente && !idsNube.has(String(e.id));
+                    });
+
+                    // 3. Mezclamos la lista de la nube + los recientes que Google olvidó
+                    events = [...data, ...eventosLocalesRecientes];
+
                     localStorage.setItem('calendarEvents', JSON.stringify(events)); 
                     renderCalendar(); 
                 }
@@ -505,9 +518,9 @@
             }).then(() => {
                 btn.innerText = "¡Sincronizado!";
                 setTimeout(() => { btn.innerText = txt; btn.disabled = false; }, 2000);
-                // IMPORTANTE: NO llamamos a cargarDeNube() aquí para evitar 
-                // que la latencia de Google borre el evento local.
-                // La auto-actualización (setInterval) lo hará después.
+                
+                // IMPORTANTE: Ya no llamamos a cargarDeNube() inmediatamente.
+                // Dejamos que el sistema automático lo haga después.
             }).catch(e => {
                 console.error(e);
                 alert("Error de conexión, se guardó localmente.");
@@ -539,7 +552,7 @@
         }
         window.onclick = (e) => { if(e.target == modal) closeModal(); }
 
-        // --- AGREGADO: AUTO-ACTUALIZACIÓN ---
+        // --- AUTO-ACTUALIZACIÓN ---
         // Busca cambios cada 30 segundos
         setInterval(() => {
             console.log("Buscando cambios...");
