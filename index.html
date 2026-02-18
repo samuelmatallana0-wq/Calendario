@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda Compartida: Carlos, Laura y Samuel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            /* TEMA CLARO */
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --accent-red: #d32f2f;
+            --accent-red-hover: #b71c1c;
+            --text-main: #333333;
+            --text-muted: #666666;
+            --border-color: #dddddd;
+            
+            /* Colores de Usuario */
+            --color-carlos: #1976D2;
+            --color-laura: #C2185B;
+            --color-samuel: #2E7D32; /* Cambiado de yo a samuel */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+        }
+
+        /* --- Panel Lateral --- */
+        .sidebar {
+            background-color: var(--card-bg);
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 5px solid var(--accent-red);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+
+        .sidebar h2 {
+            margin-bottom: 20px;
+            color: var(--accent-red);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .form-group { margin-bottom: 15px; }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        input[type="text"], input[type="date"], select, textarea {
+            width: 100%;
+            padding: 10px;
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            color: var(--text-main);
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        /* Selección de Usuarios */
+        .user-selection {
+            display: flex;
+            gap: 10px;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .user-checkbox { flex: 1; position: relative; }
+        .user-checkbox input { position: absolute; opacity: 0; cursor: pointer; }
+        .user-checkbox label {
+            display: block; text-align: center; padding: 8px 5px;
+            background: #ffffff; border-radius: 4px; cursor: pointer;
+            font-size: 0.85em; transition: all 0.2s; color: #555;
+            border: 1px solid #eee; margin-bottom: 0;
+        }
+        
+        .user-checkbox input:checked + label[for="chk-carlos"] {
+            background-color: #E3F2FD; border-color: var(--color-carlos); color: var(--color-carlos); font-weight: bold;
+        }
+        .user-checkbox input:checked + label[for="chk-laura"] {
+            background-color: #FCE4EC; border-color: var(--color-laura); color: var(--color-laura); font-weight: bold;
+        }
+        /* Actualizado selector CSS para Samuel */
+        .user-checkbox input:checked + label[for="chk-samuel"] {
+            background-color: #E8F5E9; border-color: var(--color-samuel); color: var(--color-samuel); font-weight: bold;
+        }
+
+        /* --- Gestión de Tipos --- */
+        .type-selector-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        #activeTypeColor {
+            width: 42px; height: 42px; border-radius: 6px;
+            border: 1px solid #ccc; background-color: #ddd; flex-shrink: 0;
+        }
+
+        .btn-control-type {
+            border: 1px solid #ccc; color: #555;
+            width: 42px; height: 42px; border-radius: 6px;
+            cursor: pointer; background-color: #f0f0f0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-delete-type:hover { background-color: #ffebee; color: #d32f2f; }
+
+        #newTypeForm {
+            margin-top: 10px; background: #f5f5f5; padding: 10px;
+            border-radius: 6px; border: 1px solid #ddd; display: none;
+        }
+
+        button.btn-primary {
+            width: 100%; padding: 12px; background-color: var(--accent-red);
+            color: white; border: none; border-radius: 6px; cursor: pointer;
+            font-weight: bold; margin-top: 10px;
+        }
+        button.btn-primary:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        /* --- Calendario --- */
+        .calendar-container {
+            background-color: var(--card-bg); border-radius: 12px;
+            padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .calendar-header {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 20px;
+            padding-bottom: 15px; border-bottom: 1px solid var(--border-color);
+        }
+
+        .days-grid {
+            display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px;
+        }
+
+        .day-name { text-align: center; font-weight: bold; color: var(--accent-red); padding-bottom: 10px; }
+
+        .calendar-day {
+            background-color: #ffffff; min-height: 120px; padding: 10px;
+            border-radius: 6px; position: relative; border: 1px solid #eee; cursor: pointer;
+        }
+        .calendar-day:hover { border-color: #bbb; background-color: #fafafa; }
+        .calendar-day.today { border: 1px solid var(--accent-red); background-color: #fff5f5; }
+        .day-number { font-weight: bold; margin-bottom: 5px; display: block; pointer-events: none; color: #444; }
+
+        .event-chip {
+            font-size: 0.75em; padding: 4px 6px; margin-bottom: 4px;
+            border-radius: 4px; color: white; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            border-left-width: 5px; border-left-style: solid; background-color: #666;
+        }
+
+        /* --- Modal --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: none;
+            justify-content: center; align-items: center; z-index: 1000;
+        }
+
+        .modal {
+            background: var(--card-bg); padding: 30px; border-radius: 12px; width: 400px;
+            border-top: 5px solid var(--accent-red); position: relative;
+        }
+        .close-modal { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; color: #999; }
+        .btn-delete { background-color: #ffebee; color: #d32f2f; border: 1px solid #ffcdd2; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+        
+        .script-info {
+             margin-top: 30px; padding: 10px; font-size: 0.8em; color: #666; background: #eee; border-radius: 4px; text-align: center;
+        }
+        
+        .legend { display: flex; gap: 15px; margin-top: 20px; justify-content: center; font-size: 0.9em; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; display:inline-block; margin-right:5px; }
+        .bg-carlos { background-color: var(--color-carlos); }
+        .bg-laura { background-color: var(--color-laura); }
+        .bg-samuel { background-color: var(--color-samuel); } /* Actualizado clase */
+
+        @media (max-width: 900px) {
+            .container { grid-template-columns: 1fr; }
+            .sidebar { position: static; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <aside class="sidebar" id="sidebarForm">
+            <h2><i class="fas fa-plus-circle"></i> Nueva Pendiente</h2>
+            <form id="activityForm">
+                <div class="form-group">
+                    <label>Título</label>
+                    <input type="text" id="title" placeholder="Ej: Pagar facturas" required>
+                </div>
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="date" required>
+                </div>
+                <div class="form-group">
+                    <label>Asignado a:</label>
+                    <div class="user-selection">
+                        <div class="user-checkbox"><input type="checkbox" id="chk-carlos" value="carlos"><label for="chk-carlos">Carlos</label></div>
+                        <div class="user-checkbox"><input type="checkbox" id="chk-laura" value="laura"><label for="chk-laura">Laura</label></div>
+                        <div class="user-checkbox"><input type="checkbox" id="chk-samuel" value="samuel"><label for="chk-samuel">Samuel</label></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Tipo de Actividad</label>
+                    <div class="type-selector-group">
+                        <div id="activeTypeColor"></div>
+                        <select id="type" required style="flex: 1;" onchange="updateTypePreview()"></select>
+                        <button type="button" class="btn-control-type" onclick="toggleNewTypeForm()"><i class="fas fa-plus"></i></button>
+                        <button type="button" class="btn-control-type btn-delete-type" onclick="deleteSelectedType()"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                    <div id="newTypeForm">
+                        <input type="text" id="newTypeName" placeholder="Nombre (ej: Gym)" style="width:100%; margin-bottom:5px;">
+                        <input type="color" id="newTypeColor" value="#ff9800" style="width:100%; margin-bottom:5px;">
+                        <button type="button" onclick="saveNewType()" style="width:100%;">Guardar</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notas</label>
+                    <textarea id="description" rows="2" placeholder="Detalles..."></textarea>
+                </div>
+                <button type="submit" class="btn-primary">Agregar al Calendario</button>
+            </form>
+            
+            <div class="legend">
+                <div><span class="dot bg-carlos"></span>Carlos</div>
+                <div><span class="dot bg-laura"></span>Laura</div>
+                <div><span class="dot bg-samuel"></span>Samuel</div> </div>
+            
+            <div class="script-info">
+                <i class="fas fa-cloud-upload-alt"></i> Conectado a Google Apps Script
+            </div>
+        </aside>
+
+        <main class="calendar-container">
+            <div class="calendar-header">
+                <button onclick="changeMonth(-1)">Anterior</button>
+                <h2 id="currentMonthYear"></h2>
+                <button onclick="changeMonth(1)">Siguiente</button>
+            </div>
+            <div class="days-grid">
+                <div class="day-name">Dom</div><div class="day-name">Lun</div><div class="day-name">Mar</div>
+                <div class="day-name">Mié</div><div class="day-name">Jue</div><div class="day-name">Vie</div><div class="day-name">Sáb</div>
+            </div>
+            <div id="calendarGrid" class="days-grid"></div>
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="eventModal">
+        <div class="modal">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <h3 id="modalTitle"></h3>
+            <p><strong>Fecha:</strong> <span id="modalDateDisplay"></span></p>
+            <p><strong>Asignado a:</strong> <span id="modalUser" style="text-transform: capitalize;"></span></p>
+            <p><strong>Tipo:</strong> <span id="modalType" style="padding: 2px 8px; border-radius: 4px; color: white;"></span></p>
+            <p id="modalDesc" style="margin-top: 15px; color: #555; border-top: 1px solid #eee; padding-top: 10px;"></p>
+            <div style="margin-top:20px; text-align:right;">
+                <button class="btn-delete" onclick="deleteCurrentEvent()">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Actualizado objeto de colores con la llave 'samuel'
+        const USER_COLORS = { 'carlos': '#1976D2', 'laura': '#C2185B', 'samuel': '#2E7D32' };
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyOFfXqpVJa2O-rx-ROvpyKsToY8IumtIH753IL8XwUCr3QvciDHvUN_53i9VmXxQ2y/exec";
+
+        const DEFAULT_TYPES_DATA = [
+            { id: 'general', name: 'General', color: '#607D8B' },
+            { id: 'cumpleanos', name: 'Cumpleaños', color: '#9C27B0' },
+            { id: 'pago', name: 'Pago', color: '#D32F2F' }
+        ];
+
+        let currentDate = new Date();
+        let events = JSON.parse(localStorage.getItem('calendarEvents')) || [];
+        let loadedTypes = JSON.parse(localStorage.getItem('activityTypes'));
+        let activityTypes = (loadedTypes && loadedTypes.length > 0) ? loadedTypes : DEFAULT_TYPES_DATA;
+        let currentEventId = null;
+
+        // Referencias DOM
+        let calendarGrid, currentMonthYear, typeSelect, newTypeForm, activeTypeColor, modal;
+
+        window.onload = () => {
+            calendarGrid = document.getElementById('calendarGrid');
+            currentMonthYear = document.getElementById('currentMonthYear');
+            typeSelect = document.getElementById('type');
+            newTypeForm = document.getElementById('newTypeForm');
+            activeTypeColor = document.getElementById('activeTypeColor');
+            modal = document.getElementById('eventModal');
+
+            renderTypes();
+            renderCalendar();
+            document.getElementById('date').value = new Date().toISOString().split('T')[0];
+        };
+
+        function renderTypes() {
+            const currentSelection = typeSelect.value;
+            typeSelect.innerHTML = '';
+            activityTypes.forEach(type => {
+                let opt = document.createElement('option');
+                opt.value = type.id;
+                opt.innerText = type.name;
+                typeSelect.appendChild(opt);
+            });
+            if(activityTypes.length > 0) typeSelect.value = activityTypes[0].id;
+            updateTypePreview();
+        }
+
+        function updateTypePreview() {
+            const t = activityTypes.find(x => x.id === typeSelect.value);
+            if(t) activeTypeColor.style.backgroundColor = t.color;
+        }
+
+        function toggleNewTypeForm() {
+            newTypeForm.style.display = newTypeForm.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function saveNewType() {
+            const name = document.getElementById('newTypeName').value;
+            const color = document.getElementById('newTypeColor').value;
+            if(!name) return;
+            const id = name.toLowerCase().replace(/\s+/g,'_');
+            activityTypes.push({id, name, color});
+            localStorage.setItem('activityTypes', JSON.stringify(activityTypes));
+            renderTypes();
+            typeSelect.value = id;
+            updateTypePreview();
+            toggleNewTypeForm();
+        }
+
+        function deleteSelectedType() {
+            const id = typeSelect.value;
+            if(!id) return;
+            if(activityTypes.length <= 1) return alert("Debe haber al menos un tipo.");
+            if(confirm("¿Borrar tipo?")) {
+                activityTypes = activityTypes.filter(t => t.id !== id);
+                localStorage.setItem('activityTypes', JSON.stringify(activityTypes));
+                renderTypes();
+            }
+        }
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            currentMonthYear.innerText = new Date(year, month).toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+            
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            calendarGrid.innerHTML = '';
+
+            for(let i=0; i<firstDay; i++) {
+                calendarGrid.appendChild(document.createElement('div')); // Empty
+            }
+
+            for(let i=1; i<=daysInMonth; i++) {
+                let day = document.createElement('div');
+                day.className = 'calendar-day';
+                day.innerHTML = `<span class="day-number">${i}</span>`;
+                
+                let dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                
+                day.onclick = (e) => {
+                    if(e.target.closest('.event-chip')) return;
+                    document.getElementById('date').value = dateStr;
+                };
+
+                events.filter(e => e.date === dateStr).forEach(evt => {
+                    let chip = document.createElement('div');
+                    chip.className = 'event-chip';
+                    
+                    let typeObj = activityTypes.find(t => t.id === evt.type) || activityTypes[0];
+                    chip.style.backgroundColor = typeObj.color;
+                    
+                    let users = evt.users || [];
+                    if(users.length > 1) {
+                         // Genera gradiente si hay varios usuarios
+                         let gradient = users.map(u => USER_COLORS[u] || '#ccc').join(', ');
+                         chip.style.borderImageSource = `linear-gradient(to bottom, ${gradient})`;
+                         chip.style.borderImageSlice = 1;
+                    } else if (users.length === 1) {
+                        chip.style.borderLeftColor = USER_COLORS[users[0]] || '#ccc';
+                    }
+
+                    chip.innerHTML = `<span>${evt.title}</span>`;
+                    chip.onclick = () => openModal(evt, typeObj);
+                    day.appendChild(chip);
+                });
+                calendarGrid.appendChild(day);
+            }
+        }
+
+        function changeMonth(d) {
+            currentDate.setMonth(currentDate.getMonth() + d);
+            renderCalendar();
+        }
+
+        document.getElementById('activityForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            let users = [];
+            if(document.getElementById('chk-carlos').checked) users.push('carlos');
+            if(document.getElementById('chk-laura').checked) users.push('laura');
+            // Actualizado recolección de usuario Samuel
+            if(document.getElementById('chk-samuel').checked) users.push('samuel');
+            
+            if(users.length === 0) return alert("Selecciona usuario");
+
+            let evt = {
+                id: Date.now(),
+                title: document.getElementById('title').value,
+                date: document.getElementById('date').value,
+                users: users,
+                type: document.getElementById('type').value,
+                description: document.getElementById('description').value
+            };
+
+            events.push(evt);
+            localStorage.setItem('calendarEvents', JSON.stringify(events));
+            renderCalendar();
+            enviarAScript(evt);
+        });
+
+        function enviarAScript(evt) {
+            let btn = document.querySelector('button[type="submit"]');
+            let txt = btn.innerText;
+            btn.innerText = "Guardando...";
+            btn.disabled = true;
+
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(evt)
+            }).then(() => {
+                btn.innerText = "¡Guardado!";
+                setTimeout(() => { btn.innerText = txt; btn.disabled = false; }, 2000);
+            }).catch(e => {
+                alert("Error de conexión");
+                btn.innerText = txt; btn.disabled = false;
+            });
+        }
+
+        function openModal(evt, typeObj) {
+            currentEventId = evt.id;
+            document.getElementById('modalTitle').innerText = evt.title;
+            document.getElementById('modalDateDisplay').innerText = evt.date;
+            document.getElementById('modalUser').innerText = (evt.users || []).join(', ');
+            let tInfo = document.getElementById('modalType');
+            tInfo.innerText = typeObj.name;
+            tInfo.style.backgroundColor = typeObj.color;
+            document.getElementById('modalDesc').innerText = evt.description || "";
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() { modal.style.display = 'none'; }
+
+        function deleteCurrentEvent() {
+            if(confirm("¿Eliminar?")) {
+                events = events.filter(e => e.id !== currentEventId);
+                localStorage.setItem('calendarEvents', JSON.stringify(events));
+                renderCalendar();
+                closeModal();
+            }
+        }
+        window.onclick = (e) => { if(e.target == modal) closeModal(); }
+    </script>
+</body>
+</html>
