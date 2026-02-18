@@ -205,7 +205,8 @@
         #loadingOverlay {
             position: absolute; top:0; left:0; width:100%; height:100%;
             background: rgba(255,255,255,0.8); z-index: 10;
-            display: flex; justify-content: center; align-items: center;
+            display: none; /* Oculto por defecto */
+            justify-content: center; align-items: center;
             font-weight: bold; color: var(--accent-red);
             border-radius: 12px;
         }
@@ -304,7 +305,7 @@
     <script>
         const USER_COLORS = { 'carlos': '#1976D2', 'laura': '#C2185B', 'samuel': '#2E7D32' };
         // URL de tu Script de Google
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbydRCLCLmMi4BG7vwpOJf3lbsZq9yI3qHz-oqAyaFTUYCDbBHuEgzNcdksA4Tiep5LK/exec";
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxCqWA97pVq8xufdC_OmT8FtYInJarjxMjHYemuCLfTwSNg37yka7g6BWiLiiuGwoAr/exec";
 
         const DEFAULT_TYPES_DATA = [
             { id: 'general', name: 'General', color: '#607D8B' },
@@ -334,31 +335,29 @@
             renderCalendar();
             document.getElementById('date').value = new Date().toISOString().split('T')[0];
             
-            // IMPORTANTE: Cargar datos de la nube al iniciar
-            fetchEventsFromCloud();
+            // AGREGADO: Cargar datos de la nube al iniciar
+            cargarDeNube();
         };
 
-        // Función NUEVA para traer datos de Google Sheet
-        function fetchEventsFromCloud() {
-            loadingOverlay.style.display = 'flex';
-            
-            // Usamos 'cors' para poder leer la respuesta
-            fetch(GOOGLE_SCRIPT_URL)
+        // --- NUEVA FUNCIÓN: TRAER DATOS DE GOOGLE ---
+        function cargarDeNube() {
+             // Solo mostramos overlay si no hay eventos previos (primera carga)
+             if(events.length === 0) loadingOverlay.style.display = 'flex';
+
+             fetch(GOOGLE_SCRIPT_URL)
             .then(response => response.json())
             .then(data => {
-                console.log("Datos recibidos de la nube:", data);
+                console.log("Datos actualizados:", data);
                 if(Array.isArray(data)) {
-                    events = data; // Actualizamos la lista de eventos
-                    localStorage.setItem('calendarEvents', JSON.stringify(events)); // Guardamos en caché
+                    events = data; 
+                    localStorage.setItem('calendarEvents', JSON.stringify(events)); // Actualizamos caché
                     renderCalendar(); // Redibujamos
                 }
                 loadingOverlay.style.display = 'none';
             })
             .catch(error => {
-                console.error("Error cargando datos:", error);
+                console.error("Error sincronizando:", error);
                 loadingOverlay.style.display = 'none';
-                // Si falla, seguimos mostrando lo que había en caché
-                // alert("No se pudo sincronizar con la nube. Se muestran datos locales.");
             });
         }
 
@@ -424,7 +423,6 @@
             for(let i=1; i<=daysInMonth; i++) {
                 let day = document.createElement('div');
                 day.className = 'calendar-day';
-                // Resaltar día actual
                 let today = new Date();
                 if(i === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
                     day.classList.add('today');
@@ -439,7 +437,6 @@
                     document.getElementById('date').value = dateStr;
                 };
 
-                // Filtrar y mostrar eventos
                 events.filter(e => e.date === dateStr).forEach(evt => {
                     let chip = document.createElement('div');
                     chip.className = 'event-chip';
@@ -490,10 +487,9 @@
             // Agregamos localmente para feedback inmediato
             events.push(evt);
             renderCalendar();
-            enviarAScript(evt, 'POST'); // Enviamos a Google
+            enviarAScript(evt, 'POST'); 
         });
 
-        // Modificado para usar mode: 'no-cors' solo al enviar, ya que al leer usamos cors
         function enviarAScript(data, method) {
             let btn = document.querySelector('button[type="submit"]');
             let txt = btn.innerText;
@@ -501,16 +497,17 @@
             btn.disabled = true;
 
             fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST', // Google Apps Script Web App suele usar POST para recibir
+                method: 'POST', 
                 mode: 'no-cors',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             }).then(() => {
                 btn.innerText = "¡Sincronizado!";
                 setTimeout(() => { btn.innerText = txt; btn.disabled = false; }, 2000);
+                cargarDeNube(); // Actualizamos datos reales tras guardar
             }).catch(e => {
                 console.error(e);
-                alert("Error de conexión, se guardó localmente pero no en la nube.");
+                alert("Error de conexión, se guardó localmente.");
                 btn.innerText = txt; btn.disabled = false;
             });
         }
@@ -531,19 +528,21 @@
 
         function deleteCurrentEvent() {
             if(confirm("¿Eliminar este evento?")) {
-                // Eliminamos localmente
                 events = events.filter(e => e.id !== currentEventId);
                 renderCalendar();
                 closeModal();
-                
-                // Enviar señal de borrado a Google (Necesitarías manejar esto en tu backend, 
-                // por ahora solo actualiza la vista local y reenvía el estado si tu script soporta sobrescritura)
-                // Para simplificar: La mayoría de scripts básicos solo agregan filas. 
-                // Eliminar en Google Sheets requiere un script más avanzado.
-                alert("Evento eliminado de la vista local.");
+                alert("Evento eliminado de la vista local (Recuerda que Google Sheets no permite borrar fácilmente desde aquí).");
             }
         }
         window.onclick = (e) => { if(e.target == modal) closeModal(); }
+
+        // --- AGREGADO: AUTO-ACTUALIZACIÓN ---
+        // Busca cambios cada 30 segundos
+        setInterval(() => {
+            console.log("Buscando cambios...");
+            cargarDeNube();
+        }, 30000);
+
     </script>
 </body>
 </html>
