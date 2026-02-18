@@ -339,12 +339,13 @@
             cargarDeNube();
         };
 
-        // --- NUEVA FUNCIÓN: TRAER DATOS DE GOOGLE ---
+        // --- CORREGIDO: Evitar Caché para que no borre eventos nuevos ---
         function cargarDeNube() {
              // Solo mostramos overlay si no hay eventos previos (primera carga)
              if(events.length === 0) loadingOverlay.style.display = 'flex';
 
-             fetch(GOOGLE_SCRIPT_URL)
+             // Se agrega "?t=" + tiempo para que el navegador crea que es una URL nueva y no use memoria vieja
+             fetch(GOOGLE_SCRIPT_URL + "?t=" + new Date().getTime())
             .then(response => response.json())
             .then(data => {
                 console.log("Datos actualizados:", data);
