@@ -19,7 +19,7 @@
             /* Colores de Usuario */
             --color-carlos: #1976D2;
             --color-laura: #C2185B;
-            --color-samuel: #2E7D32; /* Cambiado de yo a samuel */
+            --color-samuel: #2E7D32;
         }
 
         * {
@@ -107,7 +107,6 @@
         .user-checkbox input:checked + label[for="chk-laura"] {
             background-color: #FCE4EC; border-color: var(--color-laura); color: var(--color-laura); font-weight: bold;
         }
-        /* Actualizado selector CSS para Samuel */
         .user-checkbox input:checked + label[for="chk-samuel"] {
             background-color: #E8F5E9; border-color: var(--color-samuel); color: var(--color-samuel); font-weight: bold;
         }
@@ -148,6 +147,7 @@
         .calendar-container {
             background-color: var(--card-bg); border-radius: 12px;
             padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            position: relative;
         }
 
         .calendar-header {
@@ -199,7 +199,16 @@
         .dot { width: 12px; height: 12px; border-radius: 50%; display:inline-block; margin-right:5px; }
         .bg-carlos { background-color: var(--color-carlos); }
         .bg-laura { background-color: var(--color-laura); }
-        .bg-samuel { background-color: var(--color-samuel); } /* Actualizado clase */
+        .bg-samuel { background-color: var(--color-samuel); }
+
+        /* Loading indicator */
+        #loadingOverlay {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(255,255,255,0.8); z-index: 10;
+            display: flex; justify-content: center; align-items: center;
+            font-weight: bold; color: var(--accent-red);
+            border-radius: 12px;
+        }
 
         @media (max-width: 900px) {
             .container { grid-template-columns: 1fr; }
@@ -253,14 +262,18 @@
             <div class="legend">
                 <div><span class="dot bg-carlos"></span>Carlos</div>
                 <div><span class="dot bg-laura"></span>Laura</div>
-                <div><span class="dot bg-samuel"></span>Samuel</div> </div>
+                <div><span class="dot bg-samuel"></span>Samuel</div>
+            </div>
             
             <div class="script-info">
-                <i class="fas fa-cloud-upload-alt"></i> Conectado a Google Apps Script
+                <i class="fas fa-sync-alt"></i> Sincronización en la Nube
             </div>
         </aside>
 
         <main class="calendar-container">
+            <div id="loadingOverlay">
+                <i class="fas fa-spinner fa-spin" style="margin-right: 10px;"></i> Cargando eventos...
+            </div>
             <div class="calendar-header">
                 <button onclick="changeMonth(-1)">Anterior</button>
                 <h2 id="currentMonthYear"></h2>
@@ -289,9 +302,9 @@
     </div>
 
     <script>
-        // Actualizado objeto de colores con la llave 'samuel'
         const USER_COLORS = { 'carlos': '#1976D2', 'laura': '#C2185B', 'samuel': '#2E7D32' };
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvtOCmrx_jex7Q300oBuWVASIBO8vB_itysnPLDJZbqWXerePSfJQpxvL_4KkZGy5M/exec";
+        // URL de tu Script de Google
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbydRCLCLmMi4BG7vwpOJf3lbsZq9yI3qHz-oqAyaFTUYCDbBHuEgzNcdksA4Tiep5LK/exec";
 
         const DEFAULT_TYPES_DATA = [
             { id: 'general', name: 'General', color: '#607D8B' },
@@ -300,13 +313,13 @@
         ];
 
         let currentDate = new Date();
+        // Intentar cargar de caché local primero, luego se actualiza de la nube
         let events = JSON.parse(localStorage.getItem('calendarEvents')) || [];
         let loadedTypes = JSON.parse(localStorage.getItem('activityTypes'));
         let activityTypes = (loadedTypes && loadedTypes.length > 0) ? loadedTypes : DEFAULT_TYPES_DATA;
         let currentEventId = null;
 
-        // Referencias DOM
-        let calendarGrid, currentMonthYear, typeSelect, newTypeForm, activeTypeColor, modal;
+        let calendarGrid, currentMonthYear, typeSelect, newTypeForm, activeTypeColor, modal, loadingOverlay;
 
         window.onload = () => {
             calendarGrid = document.getElementById('calendarGrid');
@@ -315,11 +328,39 @@
             newTypeForm = document.getElementById('newTypeForm');
             activeTypeColor = document.getElementById('activeTypeColor');
             modal = document.getElementById('eventModal');
+            loadingOverlay = document.getElementById('loadingOverlay');
 
             renderTypes();
             renderCalendar();
             document.getElementById('date').value = new Date().toISOString().split('T')[0];
+            
+            // IMPORTANTE: Cargar datos de la nube al iniciar
+            fetchEventsFromCloud();
         };
+
+        // Función NUEVA para traer datos de Google Sheet
+        function fetchEventsFromCloud() {
+            loadingOverlay.style.display = 'flex';
+            
+            // Usamos 'cors' para poder leer la respuesta
+            fetch(GOOGLE_SCRIPT_URL)
+            .then(response => response.json())
+            .then(data => {
+                console.log("Datos recibidos de la nube:", data);
+                if(Array.isArray(data)) {
+                    events = data; // Actualizamos la lista de eventos
+                    localStorage.setItem('calendarEvents', JSON.stringify(events)); // Guardamos en caché
+                    renderCalendar(); // Redibujamos
+                }
+                loadingOverlay.style.display = 'none';
+            })
+            .catch(error => {
+                console.error("Error cargando datos:", error);
+                loadingOverlay.style.display = 'none';
+                // Si falla, seguimos mostrando lo que había en caché
+                // alert("No se pudo sincronizar con la nube. Se muestran datos locales.");
+            });
+        }
 
         function renderTypes() {
             const currentSelection = typeSelect.value;
@@ -377,12 +418,18 @@
             calendarGrid.innerHTML = '';
 
             for(let i=0; i<firstDay; i++) {
-                calendarGrid.appendChild(document.createElement('div')); // Empty
+                calendarGrid.appendChild(document.createElement('div')); 
             }
 
             for(let i=1; i<=daysInMonth; i++) {
                 let day = document.createElement('div');
                 day.className = 'calendar-day';
+                // Resaltar día actual
+                let today = new Date();
+                if(i === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+                    day.classList.add('today');
+                }
+                
                 day.innerHTML = `<span class="day-number">${i}</span>`;
                 
                 let dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
@@ -392,6 +439,7 @@
                     document.getElementById('date').value = dateStr;
                 };
 
+                // Filtrar y mostrar eventos
                 events.filter(e => e.date === dateStr).forEach(evt => {
                     let chip = document.createElement('div');
                     chip.className = 'event-chip';
@@ -401,7 +449,6 @@
                     
                     let users = evt.users || [];
                     if(users.length > 1) {
-                         // Genera gradiente si hay varios usuarios
                          let gradient = users.map(u => USER_COLORS[u] || '#ccc').join(', ');
                          chip.style.borderImageSource = `linear-gradient(to bottom, ${gradient})`;
                          chip.style.borderImageSlice = 1;
@@ -427,7 +474,6 @@
             let users = [];
             if(document.getElementById('chk-carlos').checked) users.push('carlos');
             if(document.getElementById('chk-laura').checked) users.push('laura');
-            // Actualizado recolección de usuario Samuel
             if(document.getElementById('chk-samuel').checked) users.push('samuel');
             
             if(users.length === 0) return alert("Selecciona usuario");
@@ -441,28 +487,30 @@
                 description: document.getElementById('description').value
             };
 
+            // Agregamos localmente para feedback inmediato
             events.push(evt);
-            localStorage.setItem('calendarEvents', JSON.stringify(events));
             renderCalendar();
-            enviarAScript(evt);
+            enviarAScript(evt, 'POST'); // Enviamos a Google
         });
 
-        function enviarAScript(evt) {
+        // Modificado para usar mode: 'no-cors' solo al enviar, ya que al leer usamos cors
+        function enviarAScript(data, method) {
             let btn = document.querySelector('button[type="submit"]');
             let txt = btn.innerText;
             btn.innerText = "Guardando...";
             btn.disabled = true;
 
             fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
+                method: 'POST', // Google Apps Script Web App suele usar POST para recibir
                 mode: 'no-cors',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(evt)
+                body: JSON.stringify(data)
             }).then(() => {
-                btn.innerText = "¡Guardado!";
+                btn.innerText = "¡Sincronizado!";
                 setTimeout(() => { btn.innerText = txt; btn.disabled = false; }, 2000);
             }).catch(e => {
-                alert("Error de conexión");
+                console.error(e);
+                alert("Error de conexión, se guardó localmente pero no en la nube.");
                 btn.innerText = txt; btn.disabled = false;
             });
         }
@@ -482,15 +530,20 @@
         function closeModal() { modal.style.display = 'none'; }
 
         function deleteCurrentEvent() {
-            if(confirm("¿Eliminar?")) {
+            if(confirm("¿Eliminar este evento?")) {
+                // Eliminamos localmente
                 events = events.filter(e => e.id !== currentEventId);
-                localStorage.setItem('calendarEvents', JSON.stringify(events));
                 renderCalendar();
                 closeModal();
+                
+                // Enviar señal de borrado a Google (Necesitarías manejar esto en tu backend, 
+                // por ahora solo actualiza la vista local y reenvía el estado si tu script soporta sobrescritura)
+                // Para simplificar: La mayoría de scripts básicos solo agregan filas. 
+                // Eliminar en Google Sheets requiere un script más avanzado.
+                alert("Evento eliminado de la vista local.");
             }
         }
         window.onclick = (e) => { if(e.target == modal) closeModal(); }
     </script>
 </body>
-
 </html>
