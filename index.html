@@ -339,20 +339,20 @@
             cargarDeNube();
         };
 
-        // --- CORREGIDO: Evitar Caché para que no borre eventos nuevos ---
+        // --- FUNCIÓN ANTICACHÉ: TRAER DATOS DE GOOGLE ---
         function cargarDeNube() {
              // Solo mostramos overlay si no hay eventos previos (primera carga)
              if(events.length === 0) loadingOverlay.style.display = 'flex';
 
-             // Se agrega "?t=" + tiempo para que el navegador crea que es una URL nueva y no use memoria vieja
+             // Usamos timestamp para romper el caché
              fetch(GOOGLE_SCRIPT_URL + "?t=" + new Date().getTime())
             .then(response => response.json())
             .then(data => {
                 console.log("Datos actualizados:", data);
                 if(Array.isArray(data)) {
                     events = data; 
-                    localStorage.setItem('calendarEvents', JSON.stringify(events)); // Actualizamos caché
-                    renderCalendar(); // Redibujamos
+                    localStorage.setItem('calendarEvents', JSON.stringify(events)); 
+                    renderCalendar(); 
                 }
                 loadingOverlay.style.display = 'none';
             })
@@ -505,7 +505,9 @@
             }).then(() => {
                 btn.innerText = "¡Sincronizado!";
                 setTimeout(() => { btn.innerText = txt; btn.disabled = false; }, 2000);
-                cargarDeNube(); // Actualizamos datos reales tras guardar
+                // IMPORTANTE: NO llamamos a cargarDeNube() aquí para evitar 
+                // que la latencia de Google borre el evento local.
+                // La auto-actualización (setInterval) lo hará después.
             }).catch(e => {
                 console.error(e);
                 alert("Error de conexión, se guardó localmente.");
