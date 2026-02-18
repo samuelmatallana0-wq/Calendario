@@ -335,42 +335,38 @@
             renderCalendar();
             document.getElementById('date').value = new Date().toISOString().split('T')[0];
             
-            // AGREGADO: Cargar datos de la nube al iniciar
+            // Cargar datos al iniciar
             cargarDeNube();
         };
 
-        // --- FUNCIÓN INTELIGENTE: PROTECCIÓN CONTRA LENTITUD DE GOOGLE ---
+        // --- FUNCIÓN PROTEGIDA CONTRA BORRADO ---
         function cargarDeNube() {
-             // Solo mostramos overlay si no hay eventos previos (primera carga)
              if(events.length === 0) loadingOverlay.style.display = 'flex';
 
              fetch(GOOGLE_SCRIPT_URL + "?t=" + new Date().getTime())
             .then(response => response.json())
             .then(data => {
-                console.log("Datos actualizados recibidos:", data);
+                console.log("Datos recibidos:", data);
                 if(Array.isArray(data)) {
-                    // AQUÍ ESTÁ EL TRUCO:
-                    // 1. Tomamos los IDs que Google nos devuelve.
-                    const idsNube = new Set(data.map(e => String(e.id)));
+                    // 1. Identificamos qué IDs vienen de la nube
+                    const idsEnNube = new Set(data.map(e => e.id.toString()));
                     
-                    // 2. Revisamos nuestros eventos locales.
-                    // Si hay un evento CREADO HACE POCO (menos de 2 minutos) que Google NO devolvió,
-                    // asumimos que es porque Google está lento, y lo volvemos a meter en la lista.
-                    const eventosLocalesRecientes = events.filter(e => {
-                        const esReciente = (Date.now() - e.id) < 120000; // 2 minutos de gracia
-                        return esReciente && !idsNube.has(String(e.id));
+                    // 2. Buscamos eventos LOCALES que todavía NO están en la nube
+                    // (Tienen la bandera isLocal = true y su ID no apareció en la descarga)
+                    const pendientesDeSubir = events.filter(e => {
+                        return e.isLocal === true && !idsEnNube.has(e.id.toString());
                     });
 
-                    // 3. Mezclamos la lista de la nube + los recientes que Google olvidó
-                    events = [...data, ...eventosLocalesRecientes];
-
+                    // 3. Fusionamos: Lo que dice la nube + Lo que nosotros tenemos pendiente
+                    events = [...data, ...pendientesDeSubir];
+                    
                     localStorage.setItem('calendarEvents', JSON.stringify(events)); 
                     renderCalendar(); 
                 }
                 loadingOverlay.style.display = 'none';
             })
             .catch(error => {
-                console.error("Error sincronizando:", error);
+                console.error("Error:", error);
                 loadingOverlay.style.display = 'none';
             });
         }
@@ -489,18 +485,25 @@
             
             if(users.length === 0) return alert("Selecciona usuario");
 
+            // Creamos ID con texto para evitar problemas de números en Excel/Sheets
+            let newId = "evt_" + Date.now();
+
             let evt = {
-                id: Date.now(),
+                id: newId,
                 title: document.getElementById('title').value,
                 date: document.getElementById('date').value,
                 users: users,
                 type: document.getElementById('type').value,
-                description: document.getElementById('description').value
+                description: document.getElementById('description').value,
+                isLocal: true // BANDERA IMPORTANTE: Marca que aún no ha subido
             };
 
-            // Agregamos localmente para feedback inmediato
+            // Agregamos localmente
             events.push(evt);
+            // Guardamos en localStorage para que la bandera isLocal no se pierda si recargas
+            localStorage.setItem('calendarEvents', JSON.stringify(events));
             renderCalendar();
+            
             enviarAScript(evt, 'POST'); 
         });
 
@@ -518,9 +521,6 @@
             }).then(() => {
                 btn.innerText = "¡Sincronizado!";
                 setTimeout(() => { btn.innerText = txt; btn.disabled = false; }, 2000);
-                
-                // IMPORTANTE: Ya no llamamos a cargarDeNube() inmediatamente.
-                // Dejamos que el sistema automático lo haga después.
             }).catch(e => {
                 console.error(e);
                 alert("Error de conexión, se guardó localmente.");
@@ -537,6 +537,12 @@
             tInfo.innerText = typeObj.name;
             tInfo.style.backgroundColor = typeObj.color;
             document.getElementById('modalDesc').innerText = evt.description || "";
+            
+            // Mostrar si está pendiente de subir
+            if(evt.isLocal) {
+                 document.getElementById('modalDesc').innerText += "\n(Sincronizando con la nube...)";
+            }
+            
             modal.style.display = 'flex';
         }
 
@@ -545,6 +551,7 @@
         function deleteCurrentEvent() {
             if(confirm("¿Eliminar este evento?")) {
                 events = events.filter(e => e.id !== currentEventId);
+                localStorage.setItem('calendarEvents', JSON.stringify(events)); // Actualizar localstorage
                 renderCalendar();
                 closeModal();
                 alert("Evento eliminado de la vista local (Recuerda que Google Sheets no permite borrar fácilmente desde aquí).");
@@ -553,7 +560,6 @@
         window.onclick = (e) => { if(e.target == modal) closeModal(); }
 
         // --- AUTO-ACTUALIZACIÓN ---
-        // Busca cambios cada 30 segundos
         setInterval(() => {
             console.log("Buscando cambios...");
             cargarDeNube();
